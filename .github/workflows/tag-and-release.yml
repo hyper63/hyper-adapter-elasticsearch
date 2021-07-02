@@ -3,15 +3,9 @@ name: Tag and Release
 on:
   workflow_dispatch:
     inputs:
-      package:
-        description: the package name to use as prefix to tag
-        required: false
       version:
         description: the server version to bump to
         required: true
-      runtime:
-        description: 'the runtime of the package. node or deno (default: deno)'
-        required: false
 
 jobs:
   release:
@@ -27,7 +21,7 @@ jobs:
           git config --global user.email "${{ github.actor }}@users.noreply.github.com"
       - name: bump
         id: bump
-        uses: hyper/hyper-ci-bump@v1
+        uses: hyper63/hyper-ci-bump@main
         with:
           bump-to: ${{github.event.inputs.version}}
           package: ${{github.event.inputs.package}}

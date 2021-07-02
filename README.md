@@ -27,14 +27,18 @@ const { fromNullable } = Either;
 export default {
   app: opine,
   adapter: [
-    { port: "search", plugins: [elasticsearch({ url: "http://localhost:9200" })] },
+    {
+      port: "search",
+      plugins: [elasticsearch({ url: "http://localhost:9200" })],
+    },
   ],
 };
 ```
 
 ## Installation
 
-This is a Deno module available to import from [nest.land](https://nest.land/package/hyper-adapter-elasticsearch)
+This is a Deno module available to import from
+[nest.land](https://nest.land/package/hyper-adapter-elasticsearch)
 
 deps.js
 
@@ -50,17 +54,22 @@ export { default as elasticsearch } from "https://x.nest.land/hyper-adapter-elas
 - retrieving an indexed document from Elasticsearch index
 - update an indexed document in Elasticsearch index
 - remove an indexed document from Elasticsearch index
-- bulk operation to index multiple docs using Elasticsearch (uses Elasticsearches [bulk api](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html#docs-bulk))
+- bulk operation to index multiple docs using Elasticsearch (uses
+  Elasticsearches
+  [bulk api](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html#docs-bulk))
 - query an Elasticsearch index
+
 ## Methods
 
-This adapter fully implements the Search port and can be used as the [hyper Search service](https://docs.hyper.io/search-api) adapter
+This adapter fully implements the Search port and can be used as the
+[hyper Search service](https://docs.hyper.io/search-api) adapter
 
 See the full port [here](https://nest.land/package/hyper-port-search)
 
 ## Contributing
 
-Contributions are welcome! See the hyper [contribution guide](https://docs.hyper.io/contributing-to-hyper)
+Contributions are welcome! See the hyper
+[contribution guide](https://docs.hyper.io/contributing-to-hyper)
 
 ## License
 
