@@ -22,7 +22,6 @@
 
 ```js
 import { default as elasticsearch } from "https://x.nest.land/hyper-adapter-elasticsearch@0.1.2/mod.js";
-const { fromNullable } = Either;
 
 export default {
   app: opine,
