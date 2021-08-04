@@ -3,7 +3,7 @@ import { R } from "./deps.js";
 import { asyncFetch, createHeaders, handleResponse } from "./async-fetch.js";
 import adapter from "./adapter.js";
 
-const { mergeDeepRight, defaultTo, pipe } = R;
+const { mergeDeepLeft, defaultTo, pipe } = R;
 
 export default function ElasticsearchAdapter(config) {
   return Object.freeze({
@@ -11,7 +11,7 @@ export default function ElasticsearchAdapter(config) {
     port: "search",
     load: pipe(
       defaultTo({}),
-      mergeDeepRight(config),
+      mergeDeepLeft(config), // perfer config over what's passed from previous load
     ),
     link: (env) =>
       () => {
