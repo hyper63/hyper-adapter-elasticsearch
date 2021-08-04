@@ -5,7 +5,7 @@
   "description": "Hyper Search port adapter for Elasticsearch",
   "homepage": "https://github.com/hyper63/hyper-adapter-elasticsearch",
   "repo": "https://github.com/hyper63/hyper-adapter-elasticsearch",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "unstable": false,
   "unlisted": false,
   "files": [
