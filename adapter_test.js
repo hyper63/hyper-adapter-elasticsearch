@@ -1,10 +1,4 @@
-import {
-  assert,
-  assertEquals,
-  assertObjectMatch,
-  resolves,
-  spy,
-} from "./dev_deps.js";
+import { assert, assertEquals, assertObjectMatch, spy } from "./dev_deps.js";
 
 import createAdapter from "./adapter.js";
 import { asyncFetch, createHeaders, handleResponse } from "./async-fetch.js";
@@ -41,7 +35,7 @@ const DOC2 = {
 const response = { json: () => Promise.resolve(), status: 200 };
 
 const stubResponse = (status, body) => {
-  response.json = resolves(body);
+  response.json = () => Promise.resolve(body);
   response.status = status;
 };
 
