@@ -173,7 +173,7 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
       )
       .bimap(
         always({ ok: false }),
-        (res) => ({ ok: true, doc: res }),
+        (res) => ({ ok: true, key, doc: res }),
       )
       .toPromise();
   }
