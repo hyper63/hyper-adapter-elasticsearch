@@ -3,5 +3,5 @@ export {
   assertEquals,
   assertObjectMatch,
   assertThrows,
-} from "https://deno.land/std@0.98.0/testing/asserts.ts";
-export { resolves, spy } from "https://deno.land/x/mock@v0.9.5/mod.ts";
+} from "https://deno.land/std@0.116.0/testing/asserts.ts";
+export { spy } from "https://deno.land/x/mock@0.12.1/mod.ts";
