@@ -280,6 +280,8 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
               must: {
                 multi_match: {
                   query,
+                  // See https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-match-query.html#query-dsl-match-query-fuzziness
+                  fuzziness: "AUTO",
                   fields,
                 },
               },
