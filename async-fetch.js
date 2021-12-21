@@ -9,6 +9,7 @@ const asyncFetch = (fetch) => Async.fromPromise(fetch);
 const createHeaders = (username, password) =>
   pipe(
     assoc("Content-Type", "application/json"),
+    assoc("Accept", "application/json"),
     ifElse(
       () => username && password,
       assoc(
@@ -24,10 +25,10 @@ const createHeaders = (username, password) =>
 const handleResponse = (pred) =>
   ifElse(
     (res) => pred(res),
-    (res) => Async.fromPromise(() => res.json())(),
     (res) =>
-      Async.fromPromise(() => res.json())()
-        .chain(Async.Rejected),
+      Async.of(res)
+        .chain(Async.fromPromise((res) => res.json())),
+    (res) => Async.Rejected(res),
   );
 
 export { asyncFetch, createHeaders, handleResponse };

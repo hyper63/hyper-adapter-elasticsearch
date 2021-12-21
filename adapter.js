@@ -1,4 +1,4 @@
-import { R } from "./deps.js";
+import { crocks, R } from "./deps.js";
 
 import {
   bulkPath,
@@ -25,64 +25,77 @@ const {
   toPairs,
 } = R;
 
-/**
-  *
-  * @typedef {Object} IndexInfo
-  * @property {string} index - index name
-  * @property {Object} mappings
-  *
-  * @typedef {Object} BulkSearchDoc
-  * @property {boolean} ok
-  * @property {string} [msg]
-  * @property {Array<any>} results
-  *
-  * @typedef {Object} SearchDoc
-  * @property {string} index
-  * @property {string} key
-  * @property {Object} doc
-  *
-  * @typedef {Object} SearchInfo
-  * @property {string} index
-  * @property {string} key
-  *
-  * @typedef {Object} SearchOptions
-  * @property {Array<string>} fields
-  * @property {Object} boost
-  * @property {boolean} prefix
-  *
-  * @typedef {Object} SearchQuery
-  * @property {string} index
-  * @property {string} query
-  * @property {SearchOptions} [options]
-  *
-  * @typedef {Object} Response
-  * @property {boolean} ok
-  * @property {string} [msg]
-  *
-  * @typedef {Object} ResponseWithResults
-  * @property {boolean} ok
-  * @property {string} [msg]
-  * @property {Array<any>} results
-  *
-  * @typedef {Object} ResponseWithMatches
-  * @property {boolean} ok
-  * @property {string} [msg]
-  * @property {Array<any>} matches
- */
+const { Async } = crocks;
 
 /**
-  * TODO:
-  * - Sanitize inputs ie. index names
-  * - Map Port api to Elasticsearch api for creating an index
-  * - Enable monitoring ie. with bimap(tap(console.err), tap(console.log))
-  * - How to support different versions of Elasticsearch?
-  * - ? Should we expose Elasticsearch response in result as res?
-  */
+ * @typedef {Object} IndexInfo
+ * @property {string} index - index name
+ * @property {Object} mappings
+ *
+ * @typedef {Object} BulkSearchDoc
+ * @property {boolean} ok
+ * @property {string} [msg]
+ * @property {Array<any>} results
+ *
+ * @typedef {Object} SearchDoc
+ * @property {string} index
+ * @property {string} key
+ * @property {Object} doc
+ *
+ * @typedef {Object} SearchInfo
+ * @property {string} index
+ * @property {string} key
+ *
+ * @typedef {Object} SearchOptions
+ * @property {Array<string>} fields
+ * @property {Object} boost
+ * @property {boolean} prefix
+ *
+ * @typedef {Object} SearchQuery
+ * @property {string} index
+ * @property {string} query
+ * @property {SearchOptions} [options]
+ *
+ * @typedef {Object} Response
+ * @property {boolean} ok
+ * @property {string} [msg]
+ *
+ * @typedef {Object} ResponseWithResults
+ * @property {boolean} ok
+ * @property {string} [msg]
+ * @property {Array<any>} results
+ *
+ * @typedef {Object} ResponseWithMatches
+ * @property {boolean} ok
+ * @property {string} [msg]
+ * @property {Array<any>} matches
+ */
+
+const handleRejectedResponse = (res) =>
+  Async.of(res)
+    .chain(Async.fromPromise((res) => res.json()))
+    .bichain(
+      () => Async.Rejected({ ok: false, status: res.status }), // not json body, so no message
+      (body) =>
+        Async.Rejected({
+          ok: false,
+          status: res.status,
+          msg: JSON.stringify(body),
+        }),
+    );
+
+/**
+ * TODO:
+ * - Sanitize inputs ie. index names
+ * - Map Port api to Elasticsearch api for creating an index
+ * - Enable monitoring ie. with bimap(tap(console.err), tap(console.log))
+ * - How to support different versions of Elasticsearch?
+ * - ? Should we expose Elasticsearch response in result as res?
+ */
 export default function ({ config, asyncFetch, headers, handleResponse }) {
   /**
    * @param {IndexInfo}
    * @returns {Promise<Response>}
-   *
    */
   function createIndex({ index, mappings }) {
     const properties = mappings.fields.reduce(
@@ -101,12 +114,10 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
         }),
       },
     )
-      .chain(
-        handleResponse((res) => res.status < 400),
-      )
-      .bimap(
-        (res) => ({ ok: false, msg: JSON.stringify(res) }),
-        always({ ok: true }),
+      .chain(handleResponse((res) => res.status < 400))
+      .bichain(
+        handleRejectedResponse,
+        always(Async.Resolved({ ok: true })),
       )
       .toPromise();
   }
@@ -126,9 +137,9 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
       .chain(
         handleResponse((res) => res.status === 200),
       )
-      .bimap(
-        always({ ok: false }),
-        always({ ok: true }),
+      .bichain(
+        handleRejectedResponse,
+        always(Async.Resolved({ ok: true })),
       )
       .toPromise();
   }
@@ -149,9 +160,9 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
       .chain(
         handleResponse((res) => res.status < 400),
       )
-      .bimap(
-        always({ ok: false }),
-        always({ ok: true }),
+      .bichain(
+        handleRejectedResponse,
+        always(Async.Resolved({ ok: true })),
       )
       .toPromise();
   }
@@ -171,9 +182,9 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
       .chain(
         handleResponse((res) => res.status < 400),
       )
-      .bimap(
-        always({ ok: false }),
-        (res) => ({ ok: true, key, doc: res }),
+      .bichain(
+        handleRejectedResponse,
+        (res) => Async.Resolved({ ok: true, key, doc: res }),
       )
       .toPromise();
   }
@@ -194,9 +205,9 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
       .chain(
         handleResponse((res) => res.status < 400),
       )
-      .bimap(
-        always({ ok: false }),
-        always({ ok: true }),
+      .bichain(
+        handleRejectedResponse,
+        always(Async.Resolved({ ok: true })),
       )
       .toPromise();
   }
@@ -216,9 +227,9 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
       .chain(
         handleResponse((res) => res.status < 400),
       )
-      .bimap(
-        always({ ok: false }),
-        always({ ok: true }),
+      .bichain(
+        handleRejectedResponse,
+        always(Async.Resolved({ ok: true })),
       )
       .toPromise();
   }
@@ -255,15 +266,14 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
       .chain(
         handleResponse((res) => res.status < 400),
       )
-      .bimap(
-        always({ ok: false }),
-        (res) => ({ ok: true, results: res.items }),
+      .bichain(
+        handleRejectedResponse,
+        (res) => Async.Resolved({ ok: true, results: res.items }),
       )
       .toPromise();
   }
 
   /**
-   *
    * @param {SearchQuery}
    * @returns {Promise<ResponseWithMatches>}
    */
@@ -294,13 +304,17 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
       },
     )
       .chain(handleResponse((res) => res.status < 400))
-      .bimap(
-        // TODO: what should message be for a failed query?
-        (res) => ({ ok: false, msg: JSON.stringify(res) }),
-        (res) => ({
-          ok: true,
-          matches: pluck("_source", res.hits.hits),
-        }),
+      .bichain(
+        // query failure
+        handleRejectedResponse,
+        // Success
+        (res) =>
+          Async.Resolved(
+            ({
+              ok: true,
+              matches: pluck("_source", res.hits.hits),
+            }),
+          ),
       )
       .toPromise();
   }

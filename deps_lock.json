@@ -3,5 +3,5 @@
   "https://cdn.skypack.dev/-/ramda@v0.27.1-3ePaNsppsnXYRcaNcaWn/dist=es2019,mode=imports/optimized/ramda.js": "0e51cd76039fc9669f9179d935b261bcbb19ecbb11d49e7e60cfbc14360a85d2",
   "https://cdn.skypack.dev/crocks@^0.12.4": "fc624b776247aa182539fed6fe1b21a578609d1c2c0e31830c4469f2bcd099cd",
   "https://cdn.skypack.dev/ramda@^0.27.1": "a87add6080b004efb8072f81063306b03dac107cd2b6e5fca726f1a8bbb969b4",
-  "https://deno.land/std@0.116.0/encoding/base64.ts": "0b58bd6477214838bf711eef43eac21e47ba9e5c81b2ce185fe25d9ecab3ebb3"
+  "https://deno.land/std@0.117.0/encoding/base64.ts": "0b58bd6477214838bf711eef43eac21e47ba9e5c81b2ce185fe25d9ecab3ebb3"
 }
