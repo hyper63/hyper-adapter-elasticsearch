@@ -16,6 +16,7 @@
 - [Features](#features)
 - [Methods](#methods)
 - [Contributing](#contributing)
+- [Testing](#testing)
 - [License](#license)
 
 ## Getting Started
@@ -64,6 +65,29 @@ This adapter fully implements the Search port and can be used as the
 [hyper Search service](https://docs.hyper.io/search-api) adapter
 
 See the full port [here](https://nest.land/package/hyper-port-search)
+
+## Testing
+
+- Spin up docker image locally
+
+```sh
+docker run \
+-p 9200:9200 -p 9600:9600 \
+-e "discovery.type=single-node" \
+-v /workspace/hyper-adapter-elasticsearch/scripts/opensearch.yml:/usr/share/opensearch/config/opensearch.yml \
+opensearchproject/opensearch:1.2.3
+```
+
+- Run hyper
+
+```sh
+./scripts/hyper.sh
+```
+
+- Run hyper-test
+
+```
+```
 
 ## Contributing
 

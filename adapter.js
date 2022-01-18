@@ -268,7 +268,7 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
       )
       .bichain(
         handleRejectedResponse,
-        (res) => Async.Resolved({ ok: true, results: res.items }),
+        (res) => Async.Resolved({ ok: true, results: map(o => ({ok: true, id: o.index._id}), res.items) }),
       )
       .toPromise();
   }
