@@ -6,6 +6,15 @@ import search from "../mod.js";
 await hyper({
   app,
   adapters: [
-    { port: "search", plugins: [search({ url: "http://localhost:9200", username: 'admin', password: 'admin' })] },
+    {
+      port: "search",
+      plugins: [
+        search({
+          url: "http://localhost:9200",
+          username: "admin",
+          password: "admin",
+        }),
+      ],
+    },
   ],
 });

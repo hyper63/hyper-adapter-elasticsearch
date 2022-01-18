@@ -268,7 +268,11 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
       )
       .bichain(
         handleRejectedResponse,
-        (res) => Async.Resolved({ ok: true, results: map(o => ({ok: true, id: o.index._id}), res.items) }),
+        (res) =>
+          Async.Resolved({
+            ok: true,
+            results: map((o) => ({ ok: true, id: o.index._id }), res.items),
+          }),
       )
       .toPromise();
   }
@@ -310,10 +314,10 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
         // Success
         (res) =>
           Async.Resolved(
-            ({
+            {
               ok: true,
               matches: pluck("_source", res.hits.hits),
-            }),
+            },
           ),
       )
       .toPromise();
