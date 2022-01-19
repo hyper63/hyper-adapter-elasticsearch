@@ -175,8 +175,8 @@ Deno.test("bulk", async () => {
   // bulk operation
   stubResponse(200, {
     items: [
-      DOC1,
-      DOC2,
+      { index: { _id: DOC1.id, ...DOC1 } },
+      { index: { _id: DOC2.id, ...DOC2 } },
     ],
   });
 
