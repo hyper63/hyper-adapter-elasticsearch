@@ -1,5 +1,12 @@
 image:
   file: .gitpod.Dockerfile
+tasks:
+  - name: Start Elasticsearch
+    init: |
+      docker build -t hyper-elasticsearch .elasticsearch
+      docker run -p 9200:9200 -p 9600:9600 --name local-hyper-elasticsearch hyper-elasticsearch
+    command: |
+      docker start -a local-hyper-elasticsearch
 
 github:
   prebuilds:
