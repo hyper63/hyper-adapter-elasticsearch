@@ -11,29 +11,26 @@ import {
   updateDocPath,
 } from "./paths.js";
 import {
+  bulkToEsBulk,
   esErrToHyperErr,
   handleHyperErr,
+  HyperErr,
+  mappingsToEsMappings,
   moveUnderscoreId,
+  queryToEsQuery,
   toEsErr,
   toUnderscoreId,
 } from "./utils.js";
 
 const {
   compose,
-  set,
-  lensProp,
   pluck,
-  reduce,
   always,
-  pipe,
   map,
-  join,
-  concat,
-  flip,
-  toPairs,
   identity,
   ifElse,
   has,
+  anyPass,
 } = R;
 
 const { Async } = crocks;
@@ -105,6 +102,9 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
     )
       .chain(
         handleResponse((res) => res.status < 400),
+      ).bimap(
+        esErrToHyperErr({ subject: `index ${index}`, index: `index ${index}` }),
+        identity,
       );
 
   /**
@@ -112,27 +112,16 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
    * @returns {Promise<Response>}
    */
   function createIndex({ index, mappings }) {
-    let properties = mappings.fields.reduce(
-      (a, f) => set(lensProp(f), { type: "text" }, a),
-      {},
-    );
+    mappings = mappingsToEsMappings(mappings);
 
-    /**
-     * _id is automatically mapped, and will produce an error if included,
-     * so rename to id
-     */
-    properties = moveUnderscoreId(properties);
-
-    console.log("adapter-elasticsearch", properties);
+    console.log("adapter-elasticsearch", mappings);
 
     return asyncFetch(
       createIndexPath(config.origin, index),
       {
         headers,
         method: "PUT",
-        body: JSON.stringify({
-          mappings: { properties },
-        }),
+        body: JSON.stringify(mappings),
       },
     )
       .chain(handleResponse((res) => res.status < 400))
@@ -197,17 +186,16 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
             method: "PUT",
             body: JSON.stringify(doc),
           },
+        ).chain(
+          handleResponse((res) => res.status < 400),
         )
-      )
-      .chain(
-        handleResponse((res) => res.status < 400),
-      )
-      .bimap(
-        esErrToHyperErr({
-          subject: `document at key ${key}`,
-          index: `index ${index}`,
-        }),
-        identity,
+          .bimap(
+            esErrToHyperErr({
+              subject: `document at key ${key}`,
+              index: `index ${index}`,
+            }),
+            identity,
+          )
       )
       .bichain(
         handleHyperErr,
@@ -267,17 +255,16 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
             method: "PUT",
             body: JSON.stringify(doc),
           },
+        ).chain(
+          handleResponse((res) => res.status < 400),
         )
-      )
-      .chain(
-        handleResponse((res) => res.status < 400),
-      )
-      .bimap(
-        esErrToHyperErr({
-          subject: `document at key ${key}`,
-          index: `index ${index}`,
-        }),
-        toUnderscoreId,
+          .bimap(
+            esErrToHyperErr({
+              subject: `document at key ${key}`,
+              index: `index ${index}`,
+            }),
+            toUnderscoreId,
+          )
       )
       .bichain(
         handleHyperErr,
@@ -322,43 +309,38 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
    */
   function bulk({ index, docs }) {
     return checkIndexExists(index)
+      // check each document has an id or _id field
+      .chain(() => {
+        return docs.filter(anyPass([
+            has("id"),
+            has("_id"),
+          ])).length === docs.length
+          ? Async.Resolved()
+          : Async.Rejected(
+            HyperErr({
+              status: 422,
+              msg: "Each document must have an id or _id field",
+            }),
+          );
+      })
       .chain(() =>
         asyncFetch(
           bulkPath(config.origin),
           {
             headers,
             method: "POST",
-            // See https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html#docs-bulk-api-example
-            body: pipe(
-              reduce(
-                (
-                  arr,
-                  doc,
-                ) => [
-                  ...arr,
-                  { index: { _index: index, _id: doc._id || doc.id } },
-                  moveUnderscoreId(doc),
-                ],
-                [],
-              ),
-              // stringify each object in arr
-              map(JSON.stringify.bind(JSON)),
-              join("\n"),
-              // Bulk payload must end with a newline
-              flip(concat)("\n"),
-            )(docs),
+            body: bulkToEsBulk(index, docs),
           },
+        ).chain(
+          handleResponse((res) => res.status < 400),
         )
-      )
-      .chain(
-        handleResponse((res) => res.status < 400),
-      )
-      .bimap(
-        esErrToHyperErr({
-          subject: `docs with ids ${pluck("id", docs).join(", ")}`,
-          index: `index ${index}`,
-        }),
-        identity,
+          .bimap(
+            esErrToHyperErr({
+              subject: `docs with ids ${pluck("id", docs).join(", ")}`,
+              index: `index ${index}`,
+            }),
+            identity,
+          )
       )
       .bichain(
         handleHyperErr,
@@ -403,23 +385,7 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
         headers,
         method: "POST",
         // anything undefined will not be stringified, so this shorthand works
-        body: JSON.stringify({
-          query: {
-            bool: {
-              must: {
-                multi_match: {
-                  query,
-                  // See https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-match-query.html#query-dsl-match-query-fuzziness
-                  fuzziness: "AUTO",
-                  fields,
-                },
-              },
-              filter: toPairs(filter).map(
-                ([key, value]) => ({ term: { [key]: value } }),
-              ),
-            },
-          },
-        }),
+        body: JSON.stringify(queryToEsQuery({ query, fields, filter })),
       },
     )
       .chain(handleResponse((res) => res.status < 400))

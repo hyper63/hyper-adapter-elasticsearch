@@ -25,6 +25,14 @@ const {
   propOr,
   always,
   path,
+  flip,
+  join,
+  reduce,
+  map,
+  concat,
+  set,
+  lensProp,
+  toPairs,
 } = R;
 
 const isDefined = complement(isNil);
@@ -177,3 +185,71 @@ export const toUnderscoreId = ifElse(
   swap("__movedUnderscoreId63__", "_id"),
   identity,
 );
+
+/**
+ * Create an elasticsearch _bulk index payload
+ *
+ * See https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html#docs-bulk-api-example
+ *
+ * @param {string} index
+ * @param {object[]} docs
+ * @returns {string} - the bulk payload to send to elasticsearch
+ */
+export const bulkToEsBulk = (index, docs) =>
+  compose(
+    // Bulk payload must end with a newline
+    flip(concat)("\n"),
+    join("\n"),
+    // stringify each object in arr
+    map(JSON.stringify.bind(JSON)),
+    reduce(
+      (
+        arr,
+        doc,
+      ) => [
+        ...arr,
+        { index: { _index: index, _id: doc._id || doc.id } },
+        moveUnderscoreId(doc),
+      ],
+      [],
+    ),
+  )(docs);
+
+/**
+ * @param {mappings} - hyper index mappings { fields }
+ * @returns {object} -
+ */
+export const mappingsToEsMappings = compose(
+  (properties) => ({
+    mappings: { properties },
+  }),
+  /**
+   * _id is automatically mapped, and will produce an error if included,
+   * so rename id
+   */
+  moveUnderscoreId,
+  (mappings) =>
+    mappings.fields.reduce(
+      (a, f) => set(lensProp(f), { type: "text" }, a),
+      {},
+    ),
+  defaultTo({ fields: [] }),
+);
+
+export const queryToEsQuery = ({ query, fields, filter }) => ({
+  query: {
+    bool: {
+      must: {
+        multi_match: {
+          query,
+          // See https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-match-query.html#query-dsl-match-query-fuzziness
+          fuzziness: "AUTO",
+          fields,
+        },
+      },
+      filter: toPairs(filter).map(
+        ([key, value]) => ({ term: { [key]: value } }),
+      ),
+    },
+  },
+});

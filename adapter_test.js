@@ -44,6 +44,7 @@ const fetch = spy(() => Promise.resolve(response));
 
 const cleanup = () => {
   fetch.calls.splice(0, fetch.calls.length);
+  stubResponse(200, { ok: true });
 };
 
 const adapter = createAdapter({
@@ -426,7 +427,7 @@ Deno.test("bulk - maps all _ids and operations", async () => {
 
   body = body.split("\n");
   console.log(body);
-  body = body.slice(0, -1);
+  body = body.slice(0, -1); // remove \n from end of list
   const [index1, first, index2] = body;
 
   assertEquals(doc1WithUnderscoreId._id, JSON.parse(index1).index._id);
@@ -457,6 +458,23 @@ Deno.test("bulk - entire request error", async () => {
   assertEquals(result.ok, false);
   assertEquals(result.status, 404);
   assertEquals(result.msg, `index ${INDEX} not found`);
+
+  cleanup();
+});
+
+Deno.test("bulk - check each doc has an id or _id", async () => {
+  const result = await adapter.bulk({
+    index: INDEX,
+    docs: [
+      { _id: DOC1.id, ...DOC1 },
+      DOC2,
+      { no_id: "foo", fizz: "buzz" },
+    ],
+  });
+
+  assertEquals(result.ok, false);
+  assertEquals(result.status, 422);
+  assertEquals(result.msg, "Each document must have an id or _id field");
 
   cleanup();
 });
