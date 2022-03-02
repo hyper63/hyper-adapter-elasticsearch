@@ -10,19 +10,27 @@ import {
   removeDocPath,
   updateDocPath,
 } from "./paths.js";
+import {
+  bulkToEsBulk,
+  esErrToHyperErr,
+  handleHyperErr,
+  HyperErr,
+  mappingsToEsMappings,
+  moveUnderscoreId,
+  queryToEsQuery,
+  toEsErr,
+  toUnderscoreId,
+} from "./utils.js";
 
 const {
-  set,
-  lensProp,
+  compose,
   pluck,
-  reduce,
   always,
-  pipe,
   map,
-  join,
-  concat,
-  flip,
-  toPairs,
+  identity,
+  ifElse,
+  has,
+  anyPass,
 } = R;
 
 const { Async } = crocks;
@@ -47,14 +55,13 @@ const { Async } = crocks;
  * @property {string} key
  *
  * @typedef {Object} SearchOptions
- * @property {Array<string>} fields
- * @property {Object} boost
- * @property {boolean} prefix
+ * @property {string} query
+ * @property {Array<string>} [fields]
+ * @property {Object} [filter]
  *
  * @typedef {Object} SearchQuery
  * @property {string} index
- * @property {string} query
- * @property {SearchOptions} [options]
+ * @property {SearchOptions} q
  *
  * @typedef {Object} Response
  * @property {boolean} ok
@@ -71,19 +78,6 @@ const { Async } = crocks;
  * @property {Array<any>} matches
  */
 
-const handleRejectedResponse = (res) =>
-  Async.of(res)
-    .chain(Async.fromPromise((res) => res.json()))
-    .bichain(
-      () => Async.Rejected({ ok: false, status: res.status }), // not json body, so no message
-      (body) =>
-        Async.Rejected({
-          ok: false,
-          status: res.status,
-          msg: JSON.stringify(body),
-        }),
-    );
-
 /**
  * TODO:
  * - Sanitize inputs ie. index names
@@ -94,29 +88,48 @@ const handleRejectedResponse = (res) =>
  */
 export default function ({ config, asyncFetch, headers, handleResponse }) {
   /**
+   * Sometimes, elasticsearch automatically creates an index
+   * we don't want that. So on some calls we check
+   */
+  const checkIndexExists = (index) =>
+    asyncFetch(
+      createIndexPath(config.origin, index),
+      {
+        headers,
+        method: "GET",
+      },
+    )
+      .chain(
+        handleResponse((res) => res.status < 400),
+      ).bimap(
+        esErrToHyperErr({ subject: `index ${index}`, index: `index ${index}` }),
+        identity,
+      );
+
+  /**
    * @param {IndexInfo}
    * @returns {Promise<Response>}
    */
   function createIndex({ index, mappings }) {
-    const properties = mappings.fields.reduce(
-      (a, f) => set(lensProp(f), { type: "text" }, a),
-      {},
-    );
-    console.log("adapter-elasticsearch", properties);
+    mappings = mappingsToEsMappings(mappings);
+
+    console.log("adapter-elasticsearch", mappings);
 
     return asyncFetch(
       createIndexPath(config.origin, index),
       {
         headers,
         method: "PUT",
-        body: JSON.stringify({
-          mappings: { properties },
-        }),
+        body: JSON.stringify(mappings),
       },
     )
       .chain(handleResponse((res) => res.status < 400))
+      .bimap(
+        esErrToHyperErr({ subject: `index ${index}`, index: `index ${index}` }),
+        identity,
+      )
       .bichain(
-        handleRejectedResponse,
+        handleHyperErr,
         always(Async.Resolved({ ok: true })),
       )
       .toPromise();
@@ -137,8 +150,12 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
       .chain(
         handleResponse((res) => res.status === 200),
       )
+      .bimap(
+        esErrToHyperErr({ subject: `index ${index}`, index: `index ${index}` }),
+        identity,
+      )
       .bichain(
-        handleRejectedResponse,
+        handleHyperErr,
         always(Async.Resolved({ ok: true })),
       )
       .toPromise();
@@ -149,19 +166,38 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
    * @returns {Promise<Response>}
    */
   function indexDoc({ index, key, doc }) {
-    return asyncFetch(
-      indexDocPath(config.origin, index, key),
-      {
-        headers,
-        method: "PUT",
-        body: JSON.stringify(doc),
-      },
-    )
-      .chain(
-        handleResponse((res) => res.status < 400),
+    /**
+     * From Elasticsearch:
+     * Field [_id] is a metadata field and cannot be added inside a document.
+     *
+     * So we rename _id
+     */
+    doc = moveUnderscoreId(doc);
+
+    // check index exists
+    return checkIndexExists(index)
+      .chain(() =>
+        // Now actually index the document
+        asyncFetch(
+          indexDocPath(config.origin, index, key),
+          {
+            headers,
+            method: "PUT",
+            body: JSON.stringify(doc),
+          },
+        ).chain(
+          handleResponse((res) => res.status < 400),
+        )
+          .bimap(
+            esErrToHyperErr({
+              subject: `document at key ${key}`,
+              index: `index ${index}`,
+            }),
+            identity,
+          )
       )
       .bichain(
-        handleRejectedResponse,
+        handleHyperErr,
         always(Async.Resolved({ ok: true })),
       )
       .toPromise();
@@ -182,8 +218,15 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
       .chain(
         handleResponse((res) => res.status < 400),
       )
+      .bimap(
+        esErrToHyperErr({
+          subject: `document at key ${key}`,
+          index: `index ${index}`,
+        }),
+        toUnderscoreId,
+      )
       .bichain(
-        handleRejectedResponse,
+        handleHyperErr,
         (res) => Async.Resolved({ ok: true, key, doc: res }),
       )
       .toPromise();
@@ -194,19 +237,36 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
    * @returns {Promise<Response>}
    */
   function updateDoc({ index, key, doc }) {
-    return asyncFetch(
-      updateDocPath(config.origin, index, key),
-      {
-        headers,
-        method: "PUT",
-        body: JSON.stringify(doc),
-      },
-    )
-      .chain(
-        handleResponse((res) => res.status < 400),
+    /**
+     * From Elasticsearch:
+     * Field [_id] is a metadata field and cannot be added inside a document.
+     *
+     * So we move _id to a field, and map it back when the document is pulled out
+     */
+    doc = moveUnderscoreId(doc);
+
+    return checkIndexExists(index)
+      .chain(() =>
+        asyncFetch(
+          updateDocPath(config.origin, index, key),
+          {
+            headers,
+            method: "PUT",
+            body: JSON.stringify(doc),
+          },
+        ).chain(
+          handleResponse((res) => res.status < 400),
+        )
+          .bimap(
+            esErrToHyperErr({
+              subject: `document at key ${key}`,
+              index: `index ${index}`,
+            }),
+            toUnderscoreId,
+          )
       )
       .bichain(
-        handleRejectedResponse,
+        handleHyperErr,
         always(Async.Resolved({ ok: true })),
       )
       .toPromise();
@@ -225,10 +285,18 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
       },
     )
       .chain(
-        handleResponse((res) => res.status < 400),
+        // 404 not found, so just map to happy path
+        handleResponse((res) => res.status < 400 || res.status === 404),
+      )
+      .bimap(
+        esErrToHyperErr({
+          subject: `document at key ${key}`,
+          index: `index ${index}`,
+        }),
+        identity,
       )
       .bichain(
-        handleRejectedResponse,
+        handleHyperErr,
         always(Async.Resolved({ ok: true })),
       )
       .toPromise();
@@ -237,41 +305,69 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
   /**
    * @param {BulkIndex}
    * @returns {Promise<ResponseWithResults>}
-   *
-   * TODO: maybe we could just Promise.all a map to indexDoc()?
    */
   function bulk({ index, docs }) {
-    return asyncFetch(
-      bulkPath(config.origin),
-      {
-        headers,
-        method: "POST",
-        // See https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html#docs-bulk-api-example
-        body: pipe(
-          reduce(
-            (
-              arr,
-              doc,
-            ) => [...arr, { index: { _index: index, _id: doc.id } }, doc],
-            [],
-          ),
-          // stringify each object in arr
-          map(JSON.stringify.bind(JSON)),
-          join("\n"),
-          // Bulk payload must end with a newline
-          flip(concat)("\n"),
-        )(docs),
-      },
-    )
-      .chain(
-        handleResponse((res) => res.status < 400),
+    return checkIndexExists(index)
+      // check each document has an id or _id field
+      .chain(() => {
+        return docs.filter(anyPass([
+            has("id"),
+            has("_id"),
+          ])).length === docs.length
+          ? Async.Resolved()
+          : Async.Rejected(
+            HyperErr({
+              status: 422,
+              msg: "Each document must have an id or _id field",
+            }),
+          );
+      })
+      .chain(() =>
+        asyncFetch(
+          bulkPath(config.origin),
+          {
+            headers,
+            method: "POST",
+            body: bulkToEsBulk(index, docs),
+          },
+        ).chain(
+          handleResponse((res) => res.status < 400),
+        )
+          .bimap(
+            esErrToHyperErr({
+              subject: `docs with ids ${pluck("id", docs).join(", ")}`,
+              index: `index ${index}`,
+            }),
+            identity,
+          )
       )
       .bichain(
-        handleRejectedResponse,
+        handleHyperErr,
+        /**
+         * bulk response could be a mixture of success and hyper errors
+         */
         (res) =>
           Async.Resolved({
             ok: true,
-            results: map((o) => ({ ok: true, id: o.index._id }), res.items),
+            results: map(
+              ifElse(
+                has("error"),
+                (item) =>
+                  compose(
+                    esErrToHyperErr({
+                      subject: `document at key ${item._id}`,
+                      index: `index ${index}`,
+                    }),
+                    () =>
+                      toEsErr({
+                        ...item.error,
+                        status: item.status,
+                      }),
+                  )(item),
+                (item) => ({ ok: true, id: item._id }),
+              ),
+              pluck("index", res.items),
+            ),
           }),
       )
       .toPromise();
@@ -288,37 +384,27 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
         headers,
         method: "POST",
         // anything undefined will not be stringified, so this shorthand works
-        body: JSON.stringify({
-          query: {
-            bool: {
-              must: {
-                multi_match: {
-                  query,
-                  // See https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-match-query.html#query-dsl-match-query-fuzziness
-                  fuzziness: "AUTO",
-                  fields,
-                },
-              },
-              filter: toPairs(filter).map(
-                ([key, value]) => ({ term: { [key]: value } }),
-              ),
-            },
-          },
-        }),
+        body: JSON.stringify(queryToEsQuery({ query, fields, filter })),
       },
     )
       .chain(handleResponse((res) => res.status < 400))
+      .bimap(
+        esErrToHyperErr({
+          subject: `query against index ${index}`,
+          index: `index ${index}`,
+        }),
+        identity,
+      )
       .bichain(
         // query failure
-        handleRejectedResponse,
+        handleHyperErr,
         // Success
         (res) =>
-          Async.Resolved(
-            {
-              ok: true,
-              matches: pluck("_source", res.hits.hits),
-            },
-          ),
+          compose(
+            (matches) => Async.Resolved({ ok: true, matches }),
+            map(toUnderscoreId),
+            pluck("_source"),
+          )(res.hits.hits),
       )
       .toPromise();
   }

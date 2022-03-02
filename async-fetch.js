@@ -1,12 +1,21 @@
 import { base64Encode, crocks, R } from "./deps.js";
+import { toEsErr } from "./utils.js";
 
 const { Async } = crocks;
-const { ifElse, assoc, pipe, identity } = R;
+const {
+  ifElse,
+  assoc,
+  pipe,
+  identity,
+  propOr,
+  compose,
+  tap,
+} = R;
 
 // TODO: Tyler. wrap with opionated approach like before with https://github.com/vercel/fetch
-const asyncFetch = (fetch) => Async.fromPromise(fetch);
+export const asyncFetch = (fetch) => Async.fromPromise(fetch);
 
-const createHeaders = (username, password) =>
+export const createHeaders = (username, password) =>
   pipe(
     assoc("Content-Type", "application/json"),
     assoc("Accept", "application/json"),
@@ -22,13 +31,26 @@ const createHeaders = (username, password) =>
     ),
   )({});
 
-const handleResponse = (pred) =>
+export const handleResponse = (pred) =>
   ifElse(
     (res) => pred(res),
     (res) =>
       Async.of(res)
         .chain(Async.fromPromise((res) => res.json())),
-    (res) => Async.Rejected(res),
+    (res) =>
+      Async.of(res)
+        .chain(Async.fromPromise((res) => res.json()))
+        .map(tap(console.log))
+        /**
+         * Elasticsearch errors have the format:
+         * { error: { reason: string }, status: number }
+         */
+        .map((body) =>
+          compose(
+            (err) => toEsErr(err, res.status),
+            assoc("status", body.status),
+            propOr(body, "error"),
+          )(body)
+        )
+        .chain(Async.Rejected),
   );
-
-export { asyncFetch, createHeaders, handleResponse };
