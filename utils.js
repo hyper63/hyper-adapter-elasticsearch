@@ -35,6 +35,8 @@ const {
   toPairs,
 } = R;
 
+export const underscoreIdAlias = "__movedUnderscoreId63__";
+
 const isDefined = complement(isNil);
 const isEmptyObject = allPass([
   complement(is(Array)), // not an array
@@ -176,13 +178,13 @@ const swap = (old, cur) =>
 
 export const moveUnderscoreId = ifElse(
   has("_id"),
-  swap("_id", "__movedUnderscoreId63__"),
+  swap("_id", underscoreIdAlias),
   identity,
 );
 
 export const toUnderscoreId = ifElse(
-  has("__movedUnderscoreId63__"),
-  swap("__movedUnderscoreId63__", "_id"),
+  has(underscoreIdAlias),
+  swap(underscoreIdAlias, "_id"),
   identity,
 );
 
@@ -244,11 +246,18 @@ export const queryToEsQuery = ({ query, fields, filter }) => ({
           query,
           // See https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-match-query.html#query-dsl-match-query-fuzziness
           fuzziness: "AUTO",
-          fields,
+          // map _id => underscoreIdAlias
+          fields: fields
+            ? fields.map((field) => field === "_id" ? underscoreIdAlias : field)
+            : undefined,
         },
       },
       filter: toPairs(filter).map(
-        ([key, value]) => ({ term: { [key]: value } }),
+        // map _id => underscoreIdAlias
+        ([key, value]) =>
+          key === "_id"
+            ? ({ term: { [underscoreIdAlias]: value } })
+            : ({ term: { [key]: value } }),
       ),
     },
   },
