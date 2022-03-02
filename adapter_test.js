@@ -12,7 +12,7 @@ import {
   removeDocPath,
   updateDocPath,
 } from "./paths.js";
-import { moveUnderscoreId } from "./utils.js";
+import { moveUnderscoreId, underscoreIdAlias } from "./utils.js";
 
 const headers = createHeaders("admin", "password");
 
@@ -126,7 +126,7 @@ Deno.test("create index - maps _id", async () => {
       method: "PUT",
       headers,
       body:
-        '{"mappings":{"properties":{"title":{"type":"text"},"__movedUnderscoreId63__":{"type":"text"}}}}',
+        `{"mappings":{"properties":{"title":{"type":"text"},"${underscoreIdAlias}":{"type":"text"}}}}`,
     }],
   });
 
@@ -540,19 +540,41 @@ Deno.test("query", async () => {
     index: "movies",
     q: {
       query: "gatsby",
-      fields: ["title"],
+      fields: ["title", "_id"],
       filter: {
         rating: 4,
+        _id: "id-1",
       },
     },
   });
 
-  assertObjectMatch(fetch.calls.pop(), {
+  const call = fetch.calls.pop();
+  assertObjectMatch(call, {
     args: [queryPath(ES, INDEX), {
       method: "POST",
       headers,
-      // TODO: Tyler. Assert body here eventually
     }],
+  });
+
+  let { args: [, { body }] } = call;
+  body = JSON.parse(body);
+
+  assertObjectMatch(body, {
+    query: {
+      bool: {
+        must: {
+          multi_match: {
+            query: "gatsby",
+            fuzziness: "AUTO",
+            fields: ["title", underscoreIdAlias],
+          },
+        },
+        filter: [
+          { term: { rating: 4 } },
+          { term: { [underscoreIdAlias]: "id-1" } },
+        ],
+      },
+    },
   });
 
   assertEquals(result.ok, true);

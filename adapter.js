@@ -55,14 +55,13 @@ const { Async } = crocks;
  * @property {string} key
  *
  * @typedef {Object} SearchOptions
- * @property {Array<string>} fields
- * @property {Object} boost
- * @property {boolean} prefix
+ * @property {string} query
+ * @property {Array<string>} [fields]
+ * @property {Object} [filter]
  *
  * @typedef {Object} SearchQuery
  * @property {string} index
- * @property {string} query
- * @property {SearchOptions} [options]
+ * @property {SearchOptions} q
  *
  * @typedef {Object} Response
  * @property {boolean} ok
