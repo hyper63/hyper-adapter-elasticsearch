@@ -1,4 +1,4 @@
-import { crocks, R } from "./deps.js";
+import { crocks, HyperErr, R } from "./deps.js";
 
 import {
   bulkPath,
@@ -14,7 +14,6 @@ import {
   bulkToEsBulk,
   esErrToHyperErr,
   handleHyperErr,
-  HyperErr,
   mappingsToEsMappings,
   moveUnderscoreId,
   queryToEsQuery,
@@ -185,7 +184,9 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
               headers,
               method: "GET",
             },
-          ).chain(handleResponse((res) => res.status === 404))
+          ).chain(
+            handleResponse((res) => res.status === 404),
+          )
             .bichain(
               () =>
                 Async.Rejected(HyperErr({
@@ -227,6 +228,7 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
    * @returns {Promise<Response>}
    */
   function getDoc({ index, key }) {
+    // Will 404 if doc or index is not found, but with different error codes in body
     return asyncFetch(
       getDocPath(config.origin, index, key),
       {
