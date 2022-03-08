@@ -44,8 +44,9 @@ export const handleResponse = (pred) =>
         /**
          * Elasticsearch errors have the format:
          * { error: { reason: string }, status: number }
+         * IF defined
          */
-        .map((body) =>
+        .map((body = { status: res.status }) =>
           compose(
             (err) => toEsErr(err, res.status),
             assoc("status", body.status),

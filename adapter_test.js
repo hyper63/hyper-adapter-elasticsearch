@@ -33,18 +33,22 @@ const DOC2 = {
   rating: 6,
 };
 
-const response = { json: () => Promise.resolve(), status: 200 };
-
-const stubResponse = (status, body) => {
-  response.json = () => Promise.resolve(body);
-  response.status = status;
+const responses = [];
+const queueResponse = (status, body) => {
+  responses.unshift({ status, body });
 };
 
-const fetch = spy(() => Promise.resolve(response));
+const fetch = spy(() => {
+  // default to 200 { ok: true }
+  const { status, body } = responses.pop() ||
+    { status: 200, body: { ok: true } };
+
+  return Promise.resolve({ json: () => Promise.resolve(body), status });
+});
 
 const cleanup = () => {
   fetch.calls.splice(0, fetch.calls.length);
-  stubResponse(200, { ok: true });
+  responses.splice(0, responses.length);
 };
 
 const adapter = createAdapter({
@@ -56,7 +60,7 @@ const adapter = createAdapter({
 
 Deno.test("remove index", async () => {
   // remove index
-  stubResponse(200, { ok: true });
+  queueResponse(200, { ok: true });
 
   const result = await adapter.deleteIndex(INDEX);
 
@@ -74,7 +78,7 @@ Deno.test("remove index", async () => {
 
 Deno.test("remove index - not found", async () => {
   // remove index
-  stubResponse(404, {
+  queueResponse(404, {
     error: {
       type: "index_not_found_exception",
       reason: "foo",
@@ -92,7 +96,7 @@ Deno.test("remove index - not found", async () => {
 
 Deno.test("create index", async () => {
   // create index
-  stubResponse(201, { ok: true });
+  queueResponse(201, { ok: true });
 
   const result = await adapter.createIndex({
     index: INDEX,
@@ -114,7 +118,7 @@ Deno.test("create index", async () => {
 
 Deno.test("create index - maps _id", async () => {
   // create index
-  stubResponse(201, { ok: true });
+  queueResponse(201, { ok: true });
 
   const result = await adapter.createIndex({
     index: INDEX,
@@ -137,7 +141,7 @@ Deno.test("create index - maps _id", async () => {
 
 Deno.test("create index - error", async () => {
   // create index
-  stubResponse(404, {
+  queueResponse(404, {
     error: {
       type: "mapper_parsing_exception",
       reason: "foo",
@@ -157,8 +161,12 @@ Deno.test("create index - error", async () => {
 });
 
 Deno.test("index document", async () => {
+  // check for existing index
+  queueResponse(200);
+  // check for existing doc
+  queueResponse(404);
   // index doc
-  stubResponse(200, { ok: true });
+  queueResponse(200, { ok: true });
 
   const result = await adapter.indexDoc({
     index: INDEX,
@@ -179,9 +187,30 @@ Deno.test("index document", async () => {
   cleanup();
 });
 
+Deno.test("index document - conflict", async () => {
+  // check for existing index
+  queueResponse(200);
+  // check for existing doc
+  queueResponse(200);
+
+  const result = await adapter.indexDoc({
+    index: INDEX,
+    key: DOC1.id,
+    doc: DOC1,
+  });
+
+  assertObjectMatch(result, {
+    ok: false,
+    status: 409,
+    msg: "document conflict",
+  });
+
+  cleanup();
+});
+
 Deno.test("index document - error", async () => {
   // index doc
-  stubResponse(404, {
+  queueResponse(404, {
     error: {
       type: "index_not_found_exception",
       reason: "foo",
@@ -202,8 +231,12 @@ Deno.test("index document - error", async () => {
 });
 
 Deno.test("index document - maps _id", async () => {
+  // check for existing index
+  queueResponse(200);
+  // check for existing doc
+  queueResponse(404);
   // index doc
-  stubResponse(200, { ok: true });
+  queueResponse(200, { ok: true });
 
   const withUnderscoreId = {
     ...DOC1,
@@ -231,7 +264,7 @@ Deno.test("index document - maps _id", async () => {
 
 Deno.test("get document", async () => {
   // get doc
-  stubResponse(200, DOC1);
+  queueResponse(200, DOC1);
 
   const result = await adapter.getDoc({
     index: INDEX,
@@ -253,7 +286,7 @@ Deno.test("get document", async () => {
 
 Deno.test("get document - error doc not found", async () => {
   // get doc
-  stubResponse(404, {
+  queueResponse(404, {
     error: {
       type: "resource_not_found_exception",
       reason: "foo",
@@ -274,7 +307,7 @@ Deno.test("get document - error doc not found", async () => {
 
 Deno.test("get document - error index not found", async () => {
   // get doc
-  stubResponse(404, {
+  queueResponse(404, {
     error: {
       type: "index_not_found_exception",
       reason: "foo",
@@ -295,7 +328,7 @@ Deno.test("get document - error index not found", async () => {
 
 Deno.test("update document", async () => {
   // update doc
-  stubResponse(201, { ok: true });
+  queueResponse(201, { ok: true });
 
   const result = await adapter.updateDoc({
     index: INDEX,
@@ -326,7 +359,7 @@ Deno.test("update document", async () => {
 
 Deno.test("delete document", async () => {
   // remove doc
-  stubResponse(201, { ok: true });
+  queueResponse(201, { ok: true });
 
   const result = await adapter.removeDoc({
     index: INDEX,
@@ -347,7 +380,7 @@ Deno.test("delete document", async () => {
 
 Deno.test("delete document - 404 passthrough", async () => {
   // remove doc
-  stubResponse(404, { ok: true });
+  queueResponse(404, { ok: true });
 
   const result = await adapter.removeDoc({
     index: INDEX,
@@ -367,8 +400,10 @@ Deno.test("delete document - 404 passthrough", async () => {
 });
 
 Deno.test("bulk", async () => {
+  // check for index
+  queueResponse(200);
   // bulk operation
-  stubResponse(200, {
+  queueResponse(200, {
     items: [
       { index: { _id: DOC1.id, ...DOC1 } },
       { index: { _id: DOC2.id, ...DOC2 } },
@@ -398,8 +433,10 @@ Deno.test("bulk", async () => {
 });
 
 Deno.test("bulk - maps all _ids and operations", async () => {
+  // check for index
+  queueResponse(200);
   // bulk operation
-  stubResponse(200, {
+  queueResponse(200, {
     items: [
       { index: { _id: DOC1.id, ...DOC1 } },
       { index: { _id: DOC2.id, ...DOC2 } },
@@ -440,7 +477,7 @@ Deno.test("bulk - maps all _ids and operations", async () => {
 
 Deno.test("bulk - entire request error", async () => {
   // bulk operation
-  stubResponse(404, {
+  queueResponse(404, {
     error: {
       type: "index_not_found_exception",
       reason: "foo",
@@ -463,6 +500,9 @@ Deno.test("bulk - entire request error", async () => {
 });
 
 Deno.test("bulk - check each doc has an id or _id", async () => {
+  // check for index
+  queueResponse(200);
+
   const result = await adapter.bulk({
     index: INDEX,
     docs: [
@@ -480,8 +520,10 @@ Deno.test("bulk - check each doc has an id or _id", async () => {
 });
 
 Deno.test("bulk - with errors", async () => {
+  // check for index
+  queueResponse(200);
   // bulk operation
-  stubResponse(200, {
+  queueResponse(200, {
     items: [
       { index: { _id: DOC1.id, ...DOC1 } },
       {
@@ -527,7 +569,7 @@ Deno.test("bulk - with errors", async () => {
 
 Deno.test("query", async () => {
   // query docs
-  stubResponse(200, {
+  queueResponse(200, {
     hits: {
       hits: [
         { _source: DOC1 },
@@ -590,7 +632,7 @@ Deno.test("query", async () => {
 
 Deno.test("query - error", async () => {
   // query docs
-  stubResponse(404, {
+  queueResponse(404, {
     error: {
       type: "index_not_found_exception",
       reason: "foo",

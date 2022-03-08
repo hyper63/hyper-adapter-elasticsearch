@@ -176,6 +176,25 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
 
     // check index exists
     return checkIndexExists(index)
+      // check doc not exist
+      .chain(
+        () =>
+          asyncFetch(
+            getDocPath(config.origin, index, key),
+            {
+              headers,
+              method: "GET",
+            },
+          ).chain(handleResponse((res) => res.status === 404))
+            .bichain(
+              () =>
+                Async.Rejected(HyperErr({
+                  status: 409,
+                  msg: "document conflict",
+                })),
+              Async.Resolved,
+            ),
+      )
       .chain(() =>
         // Now actually index the document
         asyncFetch(
