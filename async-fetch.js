@@ -1,7 +1,7 @@
-import { base64Encode, crocks, R } from "./deps.js";
-import { toEsErr } from "./utils.js";
+import { base64Encode, crocks, R } from './deps.js'
+import { toEsErr } from './utils.js'
 
-const { Async } = crocks;
+const { Async } = crocks
 const {
   ifElse,
   assoc,
@@ -10,26 +10,24 @@ const {
   propOr,
   compose,
   tap,
-} = R;
+} = R
 
 // TODO: Tyler. wrap with opionated approach like before with https://github.com/vercel/fetch
-export const asyncFetch = (fetch) => Async.fromPromise(fetch);
+export const asyncFetch = (fetch) => Async.fromPromise(fetch)
 
 export const createHeaders = (username, password) =>
   pipe(
-    assoc("Content-Type", "application/json"),
-    assoc("Accept", "application/json"),
+    assoc('Content-Type', 'application/json'),
+    assoc('Accept', 'application/json'),
     ifElse(
       () => username && password,
       assoc(
-        "authorization",
-        `Basic ${
-          base64Encode(new TextEncoder().encode(username + ":" + password))
-        }`,
+        'authorization',
+        `Basic ${base64Encode(new TextEncoder().encode(username + ':' + password))}`,
       ),
       identity,
     ),
-  )({});
+  )({})
 
 export const handleResponse = (pred) =>
   ifElse(
@@ -49,9 +47,9 @@ export const handleResponse = (pred) =>
         .map((body = { status: res.status }) =>
           compose(
             (err) => toEsErr(err, res.status),
-            assoc("status", body.status),
-            propOr(body, "error"),
+            assoc('status', body.status),
+            propOr(body, 'error'),
           )(body)
         )
         .chain(Async.Rejected),
-  );
+  )

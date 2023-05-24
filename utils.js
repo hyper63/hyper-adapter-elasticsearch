@@ -1,6 +1,6 @@
-import { crocks, HyperErr, isHyperErr, R } from "./deps.js";
+import { crocks, HyperErr, isHyperErr, R } from './deps.js'
 
-const { Async } = crocks;
+const { Async } = crocks
 const {
   assoc,
   dissoc,
@@ -22,15 +22,15 @@ const {
   set,
   lensProp,
   toPairs,
-} = R;
+} = R
 
-export const underscoreIdAlias = "__movedUnderscoreId63__";
+export const underscoreIdAlias = '__movedUnderscoreId63__'
 
 export const handleHyperErr = ifElse(
   isHyperErr,
   Async.Resolved,
   Async.Rejected,
-);
+)
 
 export const toEsErr = (err, fallbackStatus = 500) => ({
   err, // backreference
@@ -40,28 +40,27 @@ export const toEsErr = (err, fallbackStatus = 500) => ({
    * fallback to generic error message
    */
   reason: compose(
-    defaultTo(propOr("an error occurred", "reason", err)),
-    path(["caused_by", "reason"]),
+    defaultTo(propOr('an error occurred', 'reason', err)),
+    path(['caused_by', 'reason']),
   )(err),
-  type: propOr("unknown", "type", err),
+  type: propOr('unknown', 'type', err),
   /**
    * use body status
    * fallback to response status
    */
-  status: propOr(fallbackStatus, "status", err),
-});
+  status: propOr(fallbackStatus, 'status', err),
+})
 
 /**
  * Generate string templates
  */
-const template = (strings, ...keys) =>
-  (dict) => {
-    const result = [strings[0]];
-    keys.forEach((key, i) => {
-      result.push(dict[key], strings[i + 1]);
-    });
-    return result.join("");
-  };
+const template = (strings, ...keys) => (dict) => {
+  const result = [strings[0]]
+  keys.forEach((key, i) => {
+    result.push(dict[key], strings[i + 1])
+  })
+  return result.join('')
+}
 
 export const esErrToHyperErr = (context) =>
   compose(
@@ -78,47 +77,46 @@ export const esErrToHyperErr = (context) =>
           {
             resource_already_exists_exception: {
               status: 409,
-              msg: template`${"subject"} already exists`,
+              msg: template`${'subject'} already exists`,
             },
             mapper_parsing_exception: {
               status: 422,
-              msg: template
-                `failed to parse mapping for ${"subject"}: ${"reason"}`,
+              msg: template`failed to parse mapping for ${'subject'}: ${'reason'}`,
             },
             index_not_found_exception: {
               status: 404,
-              msg: template`${"index"} not found`,
+              msg: template`${'index'} not found`,
             },
             resource_not_found_exception: {
               status: 404,
-              msg: template`${"subject"} not found`,
+              msg: template`${'subject'} not found`,
             },
             not_found: {
               status: 404,
-              msg: template`${"subject"} not found`,
+              msg: template`${'subject'} not found`,
             },
           },
         ),
       ),
-  );
+  )
 
 const swap = (old, cur) =>
   compose(
     dissoc(old),
     (o) => assoc(cur, o[old], o),
-  );
+  )
 
 export const moveUnderscoreId = ifElse(
-  has("_id"),
-  swap("_id", underscoreIdAlias),
+  has('_id'),
+  swap('_id', underscoreIdAlias),
   identity,
-);
+)
 
 export const toUnderscoreId = ifElse(
   has(underscoreIdAlias),
-  swap(underscoreIdAlias, "_id"),
+  swap(underscoreIdAlias, '_id'),
   identity,
-);
+)
 
 /**
  * Create an elasticsearch _bulk index payload
@@ -132,8 +130,8 @@ export const toUnderscoreId = ifElse(
 export const bulkToEsBulk = (index, docs) =>
   compose(
     // Bulk payload must end with a newline
-    flip(concat)("\n"),
-    join("\n"),
+    flip(concat)('\n'),
+    join('\n'),
     // stringify each object in arr
     map(JSON.stringify.bind(JSON)),
     reduce(
@@ -147,7 +145,7 @@ export const bulkToEsBulk = (index, docs) =>
       ],
       [],
     ),
-  )(docs);
+  )(docs)
 
 /**
  * @param {mappings} - hyper index mappings { fields }
@@ -164,11 +162,11 @@ export const mappingsToEsMappings = compose(
   moveUnderscoreId,
   (mappings) =>
     mappings.fields.reduce(
-      (a, f) => set(lensProp(f), { type: "text" }, a),
+      (a, f) => set(lensProp(f), { type: 'text' }, a),
       {},
     ),
   defaultTo({ fields: [] }),
-);
+)
 
 export const queryToEsQuery = ({ query, fields, filter }) => ({
   query: {
@@ -177,20 +175,18 @@ export const queryToEsQuery = ({ query, fields, filter }) => ({
         multi_match: {
           query,
           // See https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-match-query.html#query-dsl-match-query-fuzziness
-          fuzziness: "AUTO",
+          fuzziness: 'AUTO',
           // map _id => underscoreIdAlias
           fields: fields
-            ? fields.map((field) => field === "_id" ? underscoreIdAlias : field)
+            ? fields.map((field) => field === '_id' ? underscoreIdAlias : field)
             : undefined,
         },
       },
       filter: toPairs(filter).map(
         // map _id => underscoreIdAlias
         ([key, value]) =>
-          key === "_id"
-            ? ({ term: { [underscoreIdAlias]: value } })
-            : ({ term: { [key]: value } }),
+          key === '_id' ? ({ term: { [underscoreIdAlias]: value } }) : ({ term: { [key]: value } }),
       ),
     },
   },
-});
+})
