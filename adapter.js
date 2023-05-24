@@ -1,4 +1,4 @@
-import { crocks, HyperErr, R } from "./deps.js";
+import { crocks, HyperErr, R } from './deps.js'
 
 import {
   bulkPath,
@@ -9,7 +9,7 @@ import {
   queryPath,
   removeDocPath,
   updateDocPath,
-} from "./paths.js";
+} from './paths.js'
 import {
   bulkToEsBulk,
   esErrToHyperErr,
@@ -19,7 +19,7 @@ import {
   queryToEsQuery,
   toEsErr,
   toUnderscoreId,
-} from "./utils.js";
+} from './utils.js'
 
 const {
   compose,
@@ -30,9 +30,9 @@ const {
   ifElse,
   has,
   anyPass,
-} = R;
+} = R
 
-const { Async } = crocks;
+const { Async } = crocks
 
 /**
  * @typedef {Object} IndexInfo
@@ -95,7 +95,7 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
       createIndexPath(config.origin, index),
       {
         headers,
-        method: "GET",
+        method: 'GET',
       },
     )
       .chain(
@@ -103,22 +103,22 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
       ).bimap(
         esErrToHyperErr({ subject: `index ${index}`, index: `index ${index}` }),
         identity,
-      );
+      )
 
   /**
    * @param {IndexInfo}
    * @returns {Promise<Response>}
    */
   function createIndex({ index, mappings }) {
-    mappings = mappingsToEsMappings(mappings);
+    mappings = mappingsToEsMappings(mappings)
 
-    console.log("adapter-elasticsearch", mappings);
+    console.log('adapter-elasticsearch', mappings)
 
     return asyncFetch(
       createIndexPath(config.origin, index),
       {
         headers,
-        method: "PUT",
+        method: 'PUT',
         body: JSON.stringify(mappings),
       },
     )
@@ -131,7 +131,7 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
         handleHyperErr,
         always(Async.Resolved({ ok: true })),
       )
-      .toPromise();
+      .toPromise()
   }
 
   /**
@@ -143,7 +143,7 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
       deleteIndexPath(config.origin, index),
       {
         headers,
-        method: "DELETE",
+        method: 'DELETE',
       },
     )
       .chain(
@@ -157,7 +157,7 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
         handleHyperErr,
         always(Async.Resolved({ ok: true })),
       )
-      .toPromise();
+      .toPromise()
   }
 
   /**
@@ -171,7 +171,7 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
      *
      * So we rename _id
      */
-    doc = moveUnderscoreId(doc);
+    doc = moveUnderscoreId(doc)
 
     // check index exists
     return checkIndexExists(index)
@@ -182,7 +182,7 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
             getDocPath(config.origin, index, key),
             {
               headers,
-              method: "GET",
+              method: 'GET',
             },
           ).chain(
             handleResponse((res) => res.status === 404),
@@ -191,7 +191,7 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
               () =>
                 Async.Rejected(HyperErr({
                   status: 409,
-                  msg: "document conflict",
+                  msg: 'document conflict',
                 })),
               Async.Resolved,
             ),
@@ -202,7 +202,7 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
           indexDocPath(config.origin, index, key),
           {
             headers,
-            method: "PUT",
+            method: 'PUT',
             body: JSON.stringify(doc),
           },
         ).chain(
@@ -220,7 +220,7 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
         handleHyperErr,
         always(Async.Resolved({ ok: true })),
       )
-      .toPromise();
+      .toPromise()
   }
 
   /**
@@ -233,7 +233,7 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
       getDocPath(config.origin, index, key),
       {
         headers,
-        method: "GET",
+        method: 'GET',
       },
     )
       .chain(
@@ -250,7 +250,7 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
         handleHyperErr,
         (res) => Async.Resolved({ ok: true, key, doc: res }),
       )
-      .toPromise();
+      .toPromise()
   }
 
   /**
@@ -264,7 +264,7 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
      *
      * So we move _id to a field, and map it back when the document is pulled out
      */
-    doc = moveUnderscoreId(doc);
+    doc = moveUnderscoreId(doc)
 
     return checkIndexExists(index)
       .chain(() =>
@@ -272,7 +272,7 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
           updateDocPath(config.origin, index, key),
           {
             headers,
-            method: "PUT",
+            method: 'PUT',
             body: JSON.stringify(doc),
           },
         ).chain(
@@ -290,7 +290,7 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
         handleHyperErr,
         always(Async.Resolved({ ok: true })),
       )
-      .toPromise();
+      .toPromise()
   }
 
   /**
@@ -302,7 +302,7 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
       removeDocPath(config.origin, index, key),
       {
         headers,
-        method: "DELETE",
+        method: 'DELETE',
       },
     )
       .chain(
@@ -320,7 +320,7 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
         handleHyperErr,
         always(Async.Resolved({ ok: true })),
       )
-      .toPromise();
+      .toPromise()
   }
 
   /**
@@ -332,23 +332,23 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
       // check each document has an id or _id field
       .chain(() => {
         return docs.filter(anyPass([
-            has("id"),
-            has("_id"),
+            has('id'),
+            has('_id'),
           ])).length === docs.length
           ? Async.Resolved()
           : Async.Rejected(
             HyperErr({
               status: 422,
-              msg: "Each document must have an id or _id field",
+              msg: 'Each document must have an id or _id field',
             }),
-          );
+          )
       })
       .chain(() =>
         asyncFetch(
           bulkPath(config.origin),
           {
             headers,
-            method: "POST",
+            method: 'POST',
             body: bulkToEsBulk(index, docs),
           },
         ).chain(
@@ -356,7 +356,7 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
         )
           .bimap(
             esErrToHyperErr({
-              subject: `docs with ids ${pluck("id", docs).join(", ")}`,
+              subject: `docs with ids ${pluck('id', docs).join(', ')}`,
               index: `index ${index}`,
             }),
             identity,
@@ -372,7 +372,7 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
             ok: true,
             results: map(
               ifElse(
-                has("error"),
+                has('error'),
                 (item) =>
                   compose(
                     esErrToHyperErr({
@@ -387,11 +387,11 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
                   )(item),
                 (item) => ({ ok: true, id: item._id }),
               ),
-              pluck("index", res.items),
+              pluck('index', res.items),
             ),
           }),
       )
-      .toPromise();
+      .toPromise()
   }
 
   /**
@@ -403,7 +403,7 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
       queryPath(config.origin, index),
       {
         headers,
-        method: "POST",
+        method: 'POST',
         // anything undefined will not be stringified, so this shorthand works
         body: JSON.stringify(queryToEsQuery({ query, fields, filter })),
       },
@@ -424,10 +424,10 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
           compose(
             (matches) => Async.Resolved({ ok: true, matches }),
             map(toUnderscoreId),
-            pluck("_source"),
+            pluck('_source'),
           )(res.hits.hits),
       )
-      .toPromise();
+      .toPromise()
   }
 
   return Object.freeze({
@@ -439,5 +439,5 @@ export default function ({ config, asyncFetch, headers, handleResponse }) {
     removeDoc,
     bulk,
     query,
-  });
+  })
 }

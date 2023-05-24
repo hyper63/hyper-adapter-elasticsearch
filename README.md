@@ -22,17 +22,17 @@
 ## Getting Started
 
 ```js
-import { default as elasticsearch } from "https://x.nest.land/hyper-adapter-elasticsearch@0.1.2/mod.js";
+import { default as elasticsearch } from 'https://x.nest.land/hyper-adapter-elasticsearch@0.1.2/mod.js'
 
 export default {
   app: opine,
   adapter: [
     {
-      port: "search",
-      plugins: [elasticsearch({ url: "http://localhost:9200" })],
+      port: 'search',
+      plugins: [elasticsearch({ url: 'http://localhost:9200' })],
     },
   ],
-};
+}
 ```
 
 ## Installation
@@ -43,7 +43,7 @@ This is a Deno module available to import from
 deps.js
 
 ```js
-export { default as elasticsearch } from "https://x.nest.land/hyper-adapter-elasticsearch@0.1.2/mod.js";
+export { default as elasticsearch } from 'https://x.nest.land/hyper-adapter-elasticsearch@0.1.2/mod.js'
 ```
 
 ## Features
@@ -54,8 +54,7 @@ export { default as elasticsearch } from "https://x.nest.land/hyper-adapter-elas
 - retrieving an indexed document from Elasticsearch index
 - update an indexed document in Elasticsearch index
 - remove an indexed document from Elasticsearch index
-- bulk operation to index multiple docs using Elasticsearch (uses
-  Elasticsearches
+- bulk operation to index multiple docs using Elasticsearch (uses Elasticsearches
   [bulk api](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html#docs-bulk))
 - query an Elasticsearch index
 
