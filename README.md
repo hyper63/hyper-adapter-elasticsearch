@@ -9,6 +9,19 @@
 
 ---
 
+<!-- toc -->
+
+- [Table of Contents](#table-of-contents)
+- [Getting Started](#getting-started)
+- [Installation](#installation)
+- [Features](#features)
+- [Methods](#methods)
+- [Testing](#testing)
+- [Contributing](#contributing)
+- [License](#license)
+
+<!-- tocstop -->
+
 ## Table of Contents
 
 - [Getting Started](#getting-started)
@@ -25,7 +38,7 @@
 import { default as elasticsearch } from 'https://x.nest.land/hyper-adapter-elasticsearch@0.1.2/mod.js'
 
 export default {
-  app: opine,
+  app,
   adapter: [
     {
       port: 'search',
