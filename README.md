@@ -22,16 +22,6 @@
 
 <!-- tocstop -->
 
-## Table of Contents
-
-- [Getting Started](#getting-started)
-- [Installation](#installation)
-- [Features](#features)
-- [Methods](#methods)
-- [Contributing](#contributing)
-- [Testing](#testing)
-- [License](#license)
-
 ## Getting Started
 
 ```js
